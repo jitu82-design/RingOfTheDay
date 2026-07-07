@@ -287,15 +287,35 @@
 (function(){
   "use strict";
 
-  // ---------- storage (persists across sessions; falls back to memory) ----------
+  // ---------- storage: keeps data across reloads in any environment ----------
+  // 1) Claude's built-in app storage (when running inside Claude)
+  // 2) browser localStorage (when the page is downloaded / self-hosted)
+  // 3) in-memory (last resort, this session only)
   const mem = {};
+  function detectBackend(){
+    if (window.storage && typeof window.storage.get === 'function') return 'cloud';
+    try { const t='__probe__'; window.localStorage.setItem(t,'1'); window.localStorage.removeItem(t); return 'local'; }
+    catch(e){ return 'mem'; }
+  }
   const store = {
+    backend: detectBackend(),
     async get(k){
-      try{ const r = await window.storage.get(k); return r ? r.value : null; }
-      catch(e){ return (k in mem) ? mem[k] : null; }
+      if(this.backend==='cloud'){
+        try{ const r=await window.storage.get(k); return r ? r.value : null; }catch(e){ return null; }
+      }
+      if(this.backend==='local'){
+        try{ const v=window.localStorage.getItem(k); return v==null ? null : JSON.parse(v); }catch(e){ return null; }
+      }
+      return (k in mem) ? mem[k] : null;
     },
     async set(k,v){
-      try{ await window.storage.set(k,v); }catch(e){ mem[k]=v; }
+      if(this.backend==='cloud'){
+        try{ await window.storage.set(k,v); return; }catch(e){ /* fall through to local */ }
+      }
+      if(this.backend==='local'){
+        try{ window.localStorage.setItem(k, JSON.stringify(v)); return; }catch(e){ /* fall through to mem */ }
+      }
+      mem[k]=v;
     }
   };
   const K = { contacts:'contacts', pick:'todayPick', history:'callHistory', streak:'streakData', raw:'rawCsvFile', meta:'dbMeta' };
