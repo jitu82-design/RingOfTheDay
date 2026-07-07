@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Today's Call</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg-top:#211D33; --bg-bottom:#3E3049;
+    --card:#F6EEE1; --card-edge:#E7DAC5;
+    --ink:#2B2334; --ink-soft:#6C6178; --ink-faint:#948AA0;
+    --gold:#E9A23B; --gold-deep:#C4801C;
+    --plum:#8A6FB0; --plum-soft:#B7A6D6;
+    --green:#3F9D6B;
+    --on-dark:#EBE5F2; --on-dark-soft:#A79EBC; --on-dark-faint:#6E657F;
+    --danger:#D66A6A;
+    --radius:22px;
+    --shadow:0 30px 70px -25px rgba(0,0,0,.65), 0 10px 30px -15px rgba(0,0,0,.5);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Inter',system-ui,sans-serif;
+    color:var(--on-dark);
+    background:
+      radial-gradient(140% 90% at 50% -10%, rgba(233,162,59,.20), transparent 55%),
+      radial-gradient(120% 80% at 85% 110%, rgba(138,111,176,.28), transparent 60%),
+      linear-gradient(170deg, var(--bg-top), var(--bg-bottom));
+    background-attachment:fixed;
+    min-height:100%;
+    display:flex; flex-direction:column;
+    align-items:center;
+    padding:26px 18px 60px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{width:100%;max-width:520px;display:flex;flex-direction:column;gap:18px}
+
+  /* top bar */
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  .streak{
+    display:inline-flex;align-items:center;gap:8px;
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);
+    padding:8px 14px;border-radius:100px;font-size:13px;font-weight:600;
+    color:var(--on-dark);letter-spacing:.01em;
+  }
+  .streak .flame{font-size:14px;filter:saturate(1.2)}
+  .streak.dim{color:var(--on-dark-soft)}
+  .icon-btn{
+    background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);
+    color:var(--on-dark);width:40px;height:40px;border-radius:12px;
+    font-size:17px;cursor:pointer;display:grid;place-items:center;
+    transition:background .18s, transform .18s;
+  }
+  .icon-btn:hover{background:rgba(255,255,255,.12)}
+  .icon-btn:active{transform:scale(.94)}
+
+  /* the card */
+  .card{
+    position:relative;background:var(--card);color:var(--ink);
+    border-radius:var(--radius);padding:38px 34px 32px;
+    box-shadow:var(--shadow);
+    border:1px solid var(--card-edge);
+    overflow:hidden;
+  }
+  .card::before{
+    content:"";position:absolute;inset:0;pointer-events:none;
+    background:radial-gradient(120% 60% at 50% 0%, rgba(255,255,255,.55), transparent 60%);
+    mix-blend-mode:soft-light;
+  }
+  .card-reveal{animation:reveal .5s cubic-bezier(.16,.84,.44,1) both}
+  @keyframes reveal{from{opacity:0;transform:translateY(10px) scale(.985)}to{opacity:1;transform:none}}
+
+  .eyebrow{
+    font-size:11px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;
+    color:var(--gold-deep);display:flex;align-items:center;gap:8px;
+  }
+  .eyebrow .dot{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 0 4px rgba(233,162,59,.18)}
+
+  .name{
+    font-family:'Instrument Serif',Georgia,serif;font-weight:400;
+    font-size:clamp(44px,13vw,66px);line-height:.98;letter-spacing:-.01em;
+    margin:16px 0 14px;color:var(--ink);word-break:break-word;
+  }
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:22px}
+  .chip{
+    font-size:12.5px;font-weight:600;padding:6px 12px;border-radius:100px;
+    background:rgba(138,111,176,.14);color:#5E4A7E;border:1px solid rgba(138,111,176,.22);
+  }
+  .chip.bday{background:rgba(233,162,59,.16);color:var(--gold-deep);border-color:rgba(233,162,59,.3)}
+  .chip.bday.today{background:var(--gold);color:#fff;border-color:transparent}
+
+  .phone-row{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;
+    padding:14px 16px;border-radius:14px;background:rgba(43,35,52,.05);
+    border:1px solid rgba(43,35,52,.08);margin-bottom:22px;
+  }
+  .phone{font-size:17px;font-weight:600;letter-spacing:.01em;font-variant-numeric:tabular-nums}
+  .phone.none{color:var(--ink-faint);font-weight:500;font-size:14px}
+  .copy{
+    background:none;border:none;color:var(--ink-soft);cursor:pointer;font-size:12.5px;
+    font-weight:600;padding:6px 8px;border-radius:8px;display:inline-flex;gap:5px;align-items:center;
+    transition:background .15s,color .15s;flex-shrink:0;
+  }
+  .copy:hover{background:rgba(43,35,52,.06);color:var(--ink)}
+
+  .actions{display:flex;flex-direction:column;gap:10px}
+  .btn{
+    border:none;cursor:pointer;font-family:inherit;font-weight:600;font-size:15.5px;
+    padding:15px;border-radius:14px;transition:transform .15s,filter .15s,background .15s;
+    display:flex;align-items:center;justify-content:center;gap:9px;text-decoration:none;
+  }
+  .btn:active{transform:scale(.98)}
+  .btn-call{background:var(--green);color:#fff;box-shadow:0 8px 20px -8px rgba(63,157,107,.7)}
+  .btn-call:hover{filter:brightness(1.05)}
+  .btn-call.disabled{background:#C9C1BB;box-shadow:none;pointer-events:none;color:#fff}
+  .btn-row{display:flex;gap:10px}
+  .btn-row .btn{flex:1}
+  .btn-ghost{background:rgba(43,35,52,.05);color:var(--ink);border:1px solid rgba(43,35,52,.1)}
+  .btn-ghost:hover{background:rgba(43,35,52,.09)}
+  .btn-ghost.done{background:rgba(63,157,107,.12);color:var(--green);border-color:rgba(63,157,107,.28)}
+
+  /* pool filter */
+  .pool{
+    display:flex;align-items:center;gap:10px;justify-content:center;
+    font-size:13px;color:var(--on-dark-soft);
+  }
+  .pool select{
+    font-family:inherit;font-size:13px;font-weight:600;color:var(--on-dark);
+    background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);
+    padding:8px 12px;border-radius:10px;cursor:pointer;
+  }
+  .pool select option{color:#222}
+
+  /* birthday banner */
+  .bday-banner{
+    display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:16px;
+    background:linear-gradient(100deg, rgba(233,162,59,.22), rgba(233,162,59,.1));
+    border:1px solid rgba(233,162,59,.3);color:#F4D9A8;font-size:14px;font-weight:500;
+  }
+  .bday-banner b{color:#fff;font-weight:600}
+  .bday-banner .cake{font-size:20px}
+
+  /* empty / upload */
+  .empty{
+    background:var(--card);color:var(--ink);border-radius:var(--radius);
+    padding:40px 30px;text-align:center;box-shadow:var(--shadow);border:1px solid var(--card-edge);
+  }
+  .empty h2{font-family:'Instrument Serif',serif;font-weight:400;font-size:34px;margin-bottom:8px}
+  .empty p{color:var(--ink-soft);font-size:14.5px;line-height:1.55;margin-bottom:24px}
+  .drop{
+    border:2px dashed var(--card-edge);border-radius:16px;padding:30px 20px;margin-bottom:18px;
+    transition:border-color .2s,background .2s;cursor:pointer;
+  }
+  .drop.over{border-color:var(--gold);background:rgba(233,162,59,.07)}
+  .drop .big{font-size:15px;font-weight:600;color:var(--ink);margin-bottom:4px}
+  .drop .sub{font-size:13px;color:var(--ink-faint)}
+  .link{background:none;border:none;color:var(--gold-deep);font-weight:600;cursor:pointer;font-size:13.5px;font-family:inherit;text-decoration:underline;text-underline-offset:2px}
+  .fmt{margin-top:20px;font-size:12px;color:var(--ink-faint);line-height:1.6}
+  .fmt code{background:rgba(43,35,52,.06);padding:2px 7px;border-radius:5px;font-size:11.5px;color:var(--ink-soft)}
+
+  /* manage panel */
+  .panel{
+    position:fixed;inset:0;background:rgba(20,16,28,.55);backdrop-filter:blur(4px);
+    display:none;align-items:flex-end;justify-content:center;z-index:50;
+  }
+  .panel.open{display:flex;animation:fade .2s both}
+  @keyframes fade{from{opacity:0}to{opacity:1}}
+  .sheet{
+    background:#251F31;width:100%;max-width:520px;border-radius:24px 24px 0 0;
+    padding:24px 22px calc(24px + env(safe-area-inset-bottom));max-height:82vh;overflow-y:auto;
+    border:1px solid rgba(255,255,255,.08);border-bottom:none;animation:slideup .28s cubic-bezier(.16,.84,.44,1) both;
+  }
+  @keyframes slideup{from{transform:translateY(30px)}to{transform:none}}
+  .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
+  .sheet-head h3{font-size:18px;font-weight:700}
+  .sheet .count{font-size:13px;color:var(--on-dark-soft);margin-bottom:18px}
+  .search{width:100%;padding:11px 14px;border-radius:11px;background:rgba(255,255,255,.06);
+    border:1px solid rgba(255,255,255,.1);color:var(--on-dark);font-family:inherit;font-size:14px;margin-bottom:14px}
+  .search::placeholder{color:var(--on-dark-faint)}
+  .clist{display:flex;flex-direction:column;gap:2px;margin-bottom:20px}
+  .crow{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 12px;border-radius:11px}
+  .crow:hover{background:rgba(255,255,255,.04)}
+  .crow .cn{font-size:14.5px;font-weight:600}
+  .crow .cm{font-size:12.5px;color:var(--on-dark-soft);margin-top:2px}
+  .crow .cg{font-size:11px;font-weight:600;color:var(--plum-soft);background:rgba(138,111,176,.18);padding:3px 9px;border-radius:100px;flex-shrink:0}
+  .sheet-actions{display:flex;gap:10px;flex-wrap:wrap}
+  .mini{font-family:inherit;font-size:13px;font-weight:600;padding:11px 14px;border-radius:11px;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:var(--on-dark);flex:1;min-width:130px}
+  .mini:hover{background:rgba(255,255,255,.11)}
+  .mini.danger{color:var(--danger);border-color:rgba(214,106,106,.3)}
+  .mini.danger:hover{background:rgba(214,106,106,.12)}
+
+  .toast{
+    position:fixed;bottom:26px;left:50%;transform:translateX(-50%) translateY(20px);
+    background:#171320;color:#fff;padding:12px 20px;border-radius:100px;font-size:13.5px;font-weight:500;
+    box-shadow:0 12px 30px -8px rgba(0,0,0,.6);opacity:0;pointer-events:none;transition:.25s;z-index:80;
+    border:1px solid rgba(255,255,255,.1);
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+  .foot{text-align:center;font-size:11.5px;color:var(--on-dark-faint);margin-top:4px}
+  .hidden{display:none!important}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  @media (max-width:420px){.card{padding:32px 24px 28px}}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <span class="streak dim" id="streak"><span class="flame">🔥</span><span id="streakText">No streak yet</span></span>
+      <button class="icon-btn" id="manageBtn" title="Manage contacts" aria-label="Manage contacts">☰</button>
+    </div>
+
+    <div id="bdayBanner" class="bday-banner hidden"></div>
+
+    <!-- EMPTY STATE -->
+    <div id="emptyState" class="empty hidden">
+      <h2>Your deck is empty</h2>
+      <p>Upload a CSV of the people you want to keep in touch with. Each day, one gets drawn for you to call.</p>
+      <div class="drop" id="drop">
+        <div class="big">Drop a CSV here or tap to choose</div>
+        <div class="sub">.csv file from your phone or computer</div>
+      </div>
+      <button class="link" id="templateBtn">Download a sample CSV</button>
+      <div class="fmt">
+        Columns it reads: <code>name</code>, <code>phone</code>, <code>group</code>, <code>birthday</code>.<br>
+        Only <code>name</code> is required — the rest are optional.
+      </div>
+    </div>
+
+    <!-- TODAY CARD -->
+    <div id="cardState" class="hidden">
+      <div class="card" id="card">
+        <div class="eyebrow"><span class="dot"></span><span id="dateLabel">Today's call</span></div>
+        <div class="name" id="personName">—</div>
+        <div class="chips" id="chips"></div>
+        <div class="phone-row">
+          <span class="phone" id="phone">—</span>
+          <button class="copy" id="copyBtn" title="Copy number">⧉ Copy</button>
+        </div>
+        <div class="actions">
+          <a class="btn btn-call" id="callBtn" href="#">📞 Call</a>
+          <div class="btn-row">
+            <button class="btn btn-ghost" id="calledBtn">Mark as called</button>
+            <button class="btn btn-ghost" id="redrawBtn">Draw someone else</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="pool">
+        <span>Draw from</span>
+        <select id="poolSelect"><option value="__all__">Everyone</option></select>
+      </div>
+    </div>
+
+    <div class="foot" id="foot"></div>
+  </div>
+
+  <!-- MANAGE PANEL -->
+  <div class="panel" id="panel">
+    <div class="sheet">
+      <div class="sheet-head">
+        <h3>Your contacts</h3>
+        <button class="icon-btn" id="closePanel" aria-label="Close">✕</button>
+      </div>
+      <div class="count" id="panelCount"></div>
+      <input class="search" id="search" placeholder="Search contacts…" autocomplete="off">
+      <div class="clist" id="clist"></div>
+      <div class="sheet-actions">
+        <button class="mini" id="replaceBtn">Replace with new CSV</button>
+        <button class="mini" id="addTemplate">Download sample CSV</button>
+        <button class="mini danger" id="clearBtn">Clear all contacts</button>
+      </div>
+    </div>
+  </div>
+
+  <input type="file" id="fileInput" accept=".csv,text/csv" class="hidden">
+  <div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ---------- storage (persists across sessions; falls back to memory) ----------
+  const mem = {};
+  const store = {
+    async get(k){
+      try{ const r = await window.storage.get(k); return r ? r.value : null; }
+      catch(e){ return (k in mem) ? mem[k] : null; }
+    },
+    async set(k,v){
+      try{ await window.storage.set(k,v); }catch(e){ mem[k]=v; }
+    }
+  };
+  const K = { contacts:'contacts', pick:'todayPick', history:'callHistory', streak:'streakData' };
+
+  // ---------- state ----------
+  let contacts = [];
+  let todayPick = null;      // {id, date}
+  let history = {};          // { 'YYYY-MM-DD': [ids] }
+  let streak = { count:0, last:null };
+  let currentPool = '__all__';
+
+  // ---------- helpers ----------
+  const $ = s => document.querySelector(s);
+  const todayKey = () => { const d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); };
+  const prettyDate = () => new Date().toLocaleDateString(undefined,{weekday:'long',month:'long',day:'numeric'});
+  let toastTimer;
+  function toast(msg){ const t=$('#toast'); t.textContent=msg; t.classList.add('show'); clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),2200); }
+
+  // ---------- CSV parsing ----------
+  function parseCSV(text){
+    text = text.replace(/^\uFEFF/,'').replace(/\r\n?/g,'\n');
+    const rows=[]; let row=[], field='', q=false;
+    for(let i=0;i<text.length;i++){
+      const c=text[i];
+      if(q){
+        if(c==='"'){ if(text[i+1]==='"'){field+='"';i++;} else q=false; }
+        else field+=c;
+      } else {
+        if(c==='"') q=true;
+        else if(c===','){ row.push(field); field=''; }
+        else if(c==='\n'){ row.push(field); rows.push(row); row=[]; field=''; }
+        else field+=c;
+      }
+    }
+    if(field!==''||row.length){ row.push(field); rows.push(row); }
+    return rows.filter(r=>r.some(c=>c.trim()!==''));
+  }
+
+  function pick(headers,cands){
+    for(const cand of cands){
+      const idx = headers.findIndex(h=>h===cand);
+      if(idx>-1) return idx;
+    }
+    for(const cand of cands){
+      const idx = headers.findIndex(h=>h.includes(cand));
+      if(idx>-1) return idx;
+    }
+    return -1;
+  }
+
+  function contactsFromCSV(text){
+    const rows = parseCSV(text);
+    if(!rows.length) return [];
+    let headers = rows[0].map(h=>h.trim().toLowerCase());
+    const nameI = pick(headers,['name','full name','contact','first name']);
+    const phoneI = pick(headers,['phone','number','mobile','cell','tel']);
+    const groupI = pick(headers,['group','category','type','tag','relationship']);
+    const bdayI = pick(headers,['birthday','birthdate','dob','born','birth']);
+    // if no recognizable header, assume col order name,phone,group,birthday
+    const hasHeader = nameI>-1 || phoneI>-1;
+    const start = hasHeader ? 1 : 0;
+    const ni = hasHeader ? (nameI>-1?nameI:0) : 0;
+    const pi = hasHeader ? phoneI : 1;
+    const gi = hasHeader ? groupI : 2;
+    const bi = hasHeader ? bdayI : 3;
+    const out=[];
+    for(let r=start;r<rows.length;r++){
+      const cols=rows[r];
+      const name=(cols[ni]||'').trim();
+      if(!name) continue;
+      out.push({
+        id:'c'+r+'_'+Math.random().toString(36).slice(2,7),
+        name,
+        phone: pi>-1 ? (cols[pi]||'').trim() : '',
+        group: gi>-1 ? (cols[gi]||'').trim() : '',
+        birthday: bi>-1 ? (cols[bi]||'').trim() : ''
+      });
+    }
+    return out;
+  }
+
+  // ---------- birthday parsing ----------
+  const MONTHS={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12,jan:1,feb:2,mar:3,apr:4,jun:6,jul:7,aug:8,sep:9,sept:9,oct:10,nov:11,dec:12};
+  function parseBirthday(s){
+    if(!s) return null; s=s.trim().toLowerCase();
+    let m;
+    if((m=s.match(/(\d{4})[-/](\d{1,2})[-/](\d{1,2})/))) return {m:+m[2],d:+m[3]};       // YYYY-MM-DD
+    if((m=s.match(/^(\d{1,2})[-/](\d{1,2})(?:[-/]\d{2,4})?$/))) return {m:+m[1],d:+m[2]}; // MM/DD[/YYYY]
+    if((m=s.match(/([a-z]+)\s+(\d{1,2})/)) && MONTHS[m[1]]) return {m:MONTHS[m[1]],d:+m[2]}; // March 5
+    if((m=s.match(/(\d{1,2})\s+([a-z]+)/)) && MONTHS[m[2]]) return {m:MONTHS[m[2]],d:+m[1]}; // 5 March
+    return null;
+  }
+  function daysUntilBirthday(b){
+    if(!b) return null;
+    const now=new Date(); const y=now.getFullYear();
+    let next=new Date(y,b.m-1,b.d);
+    const t=new Date(y,now.getMonth(),now.getDate());
+    if(next<t) next=new Date(y+1,b.m-1,b.d);
+    return Math.round((next-t)/86400000);
+  }
+  function bdayLabel(raw){
+    const b=parseBirthday(raw); if(!b) return null;
+    const days=daysUntilBirthday(b);
+    const dateStr=new Date(2000,b.m-1,b.d).toLocaleDateString(undefined,{month:'short',day:'numeric'});
+    if(days===0) return {today:true, text:'🎂 Birthday today ('+dateStr+')'};
+    if(days<=7) return {today:false, text:'🎂 Birthday in '+days+' day'+(days>1?'s':'')+' ('+dateStr+')'};
+    return {today:false, soft:true, text:'Birthday '+dateStr};
+  }
+
+  // ---------- pool ----------
+  function poolContacts(){
+    if(currentPool==='__all__') return contacts;
+    return contacts.filter(c=>(c.group||'Ungrouped')===currentPool);
+  }
+  function groups(){
+    const set=new Set();
+    contacts.forEach(c=>{ if(c.group) set.add(c.group); });
+    return [...set].sort((a,b)=>a.localeCompare(b));
+  }
+
+  // ---------- draw logic (stable per day, pure random) ----------
+  function randomFrom(list,excludeId){
+    const pool = excludeId ? list.filter(c=>c.id!==excludeId) : list;
+    const src = pool.length ? pool : list;
+    if(!src.length) return null;
+    return src[Math.floor(Math.random()*src.length)];
+  }
+  async function ensureTodayPick(){
+    const pool=poolContacts();
+    if(!pool.length){ todayPick=null; return; }
+    if(todayPick && todayPick.date===todayKey() && pool.some(c=>c.id===todayPick.id)) return;
+    const chosen=randomFrom(pool);
+    todayPick={id:chosen.id,date:todayKey()};
+    await store.set(K.pick,todayPick);
+  }
+  async function redraw(){
+    const pool=poolContacts();
+    if(pool.length<1) return;
+    const chosen=randomFrom(pool, todayPick&&todayPick.id);
+    todayPick={id:chosen.id,date:todayKey()};
+    await store.set(K.pick,todayPick);
+    render(true);
+  }
+
+  // ---------- streak ----------
+  async function markCalled(){
+    if(!todayPick) return;
+    const tk=todayKey();
+    history[tk]=history[tk]||[];
+    if(!history[tk].includes(todayPick.id)) history[tk].push(todayPick.id);
+    await store.set(K.history,history);
+    // update streak
+    if(streak.last!==tk){
+      const y=new Date(); y.setDate(y.getDate()-1);
+      const yk=y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0');
+      streak.count = (streak.last===yk) ? streak.count+1 : 1;
+      streak.last=tk;
+      await store.set(K.streak,streak);
+    }
+    renderStreak(); renderCard(true);
+    toast('Nice — logged for today ✓');
+  }
+  function calledToday(){ const tk=todayKey(); return todayPick && history[tk] && history[tk].includes(todayPick.id); }
+
+  // ---------- rendering ----------
+  function renderStreak(){
+    const el=$('#streak'), t=$('#streakText');
+    // reset streak if a day was skipped
+    if(streak.last){
+      const y=new Date(); y.setDate(y.getDate()-1);
+      const yk=y.getFullYear()+'-'+String(y.getMonth()+1).padStart(2,'0')+'-'+String(y.getDate()).padStart(2,'0');
+      if(streak.last!==todayKey() && streak.last!==yk){ streak={count:0,last:null}; }
+    }
+    if(streak.count>0){ el.classList.remove('dim'); t.textContent=streak.count+'-day streak'; }
+    else { el.classList.add('dim'); t.textContent='No streak yet'; }
+  }
+
+  function renderBdayBanner(){
+    const banner=$('#bdayBanner');
+    const todays=contacts.filter(c=>{ const l=bdayLabel(c.birthday); return l&&l.today; });
+    if(!todays.length){ banner.classList.add('hidden'); return; }
+    banner.classList.remove('hidden');
+    const names=todays.map(c=>c.name);
+    const list = names.length===1 ? names[0] : names.slice(0,-1).join(', ')+' & '+names.slice(-1);
+    banner.innerHTML='<span class="cake">🎂</span><span>It\'s <b>'+esc(list)+'</b>\'s birthday today — a great reason to call.</span>';
+  }
+
+  function esc(s){ return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+  function renderCard(animate){
+    const c = contacts.find(x=>todayPick && x.id===todayPick.id);
+    if(!c) return;
+    $('#dateLabel').textContent="Today's call · "+prettyDate();
+    $('#personName').textContent=c.name;
+
+    const chips=$('#chips'); chips.innerHTML='';
+    if(c.group){ const g=document.createElement('span'); g.className='chip'; g.textContent=c.group; chips.appendChild(g); }
+    const bl=bdayLabel(c.birthday);
+    if(bl){ const b=document.createElement('span'); b.className='chip bday'+(bl.today?' today':''); b.textContent=bl.text; chips.appendChild(b); }
+
+    const phoneEl=$('#phone'), callBtn=$('#callBtn'), copyBtn=$('#copyBtn');
+    if(c.phone){
+      phoneEl.textContent=c.phone; phoneEl.classList.remove('none');
+      callBtn.href='tel:'+c.phone.replace(/[^\d+]/g,''); callBtn.classList.remove('disabled');
+      callBtn.textContent=''; callBtn.append('📞 Call '+c.name.split(' ')[0]);
+      copyBtn.style.visibility='visible';
+    } else {
+      phoneEl.textContent='No number on file'; phoneEl.classList.add('none');
+      callBtn.href='#'; callBtn.classList.add('disabled'); callBtn.textContent='No number to call';
+      copyBtn.style.visibility='hidden';
+    }
+
+    const calledBtn=$('#calledBtn');
+    if(calledToday()){ calledBtn.textContent='✓ Called today'; calledBtn.classList.add('done'); }
+    else { calledBtn.textContent='Mark as called'; calledBtn.classList.remove('done'); }
+
+    const card=$('#card');
+    if(animate){ card.classList.remove('card-reveal'); void card.offsetWidth; card.classList.add('card-reveal'); }
+  }
+
+  function renderPool(){
+    const sel=$('#poolSelect'); const gs=groups();
+    sel.innerHTML='<option value="__all__">Everyone ('+contacts.length+')</option>';
+    gs.forEach(g=>{ const n=contacts.filter(c=>c.group===g).length; const o=document.createElement('option'); o.value=g; o.textContent=g+' ('+n+')'; sel.appendChild(o); });
+    sel.value = groups().includes(currentPool)||currentPool==='__all__' ? currentPool : '__all__';
+    sel.parentElement.style.display = gs.length ? 'flex':'none';
+  }
+
+  function renderList(filter){
+    const list=$('#clist'); list.innerHTML='';
+    const f=(filter||'').toLowerCase();
+    const items=contacts.filter(c=>!f||c.name.toLowerCase().includes(f)||(c.group||'').toLowerCase().includes(f));
+    $('#panelCount').textContent=contacts.length+' contact'+(contacts.length!==1?'s':'')+' saved';
+    if(!items.length){ list.innerHTML='<div style="padding:14px;color:var(--on-dark-soft);font-size:13.5px">No matches.</div>'; return; }
+    items.forEach(c=>{
+      const row=document.createElement('div'); row.className='crow';
+      const left=document.createElement('div');
+      left.innerHTML='<div class="cn">'+esc(c.name)+'</div>'+(c.phone?'<div class="cm">'+esc(c.phone)+'</div>':'');
+      row.appendChild(left);
+      if(c.group){ const g=document.createElement('span'); g.className='cg'; g.textContent=c.group; row.appendChild(g); }
+      list.appendChild(row);
+    });
+  }
+
+  function render(animate){
+    const has=contacts.length>0;
+    $('#emptyState').classList.toggle('hidden',has);
+    $('#cardState').classList.toggle('hidden',!has);
+    renderStreak(); renderBdayBanner();
+    if(has){ renderPool(); renderCard(animate); $('#foot').textContent='One call a day keeps the people close.'; }
+    else { $('#foot').textContent=''; }
+  }
+
+  // ---------- CSV intake ----------
+  async function loadFile(file){
+    if(!file) return;
+    if(!/\.csv$/i.test(file.name) && file.type!=='text/csv'){ toast('Please choose a .csv file'); return; }
+    const text=await file.text();
+    const parsed=contactsFromCSV(text);
+    if(!parsed.length){ toast('No contacts found — check the file has a name column'); return; }
+    contacts=parsed;
+    await store.set(K.contacts,contacts);
+    todayPick=null; await store.set(K.pick,null);
+    currentPool='__all__';
+    await ensureTodayPick();
+    render(true);
+    toast(parsed.length+' contact'+(parsed.length!==1?'s':'')+' loaded');
+  }
+
+  function sampleCSV(){
+    const csv='name,phone,group,birthday\n'+
+      'Mom,555-0101,Family,1958-04-12\n'+
+      'James Okoro,555-0142,Friends,'+ (function(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})() +'\n'+
+      'Priya Sharma,555-0199,Work,March 3\n'+
+      'Uncle Ray,555-0177,Family,11/20\n'+
+      'Dana Whitfield,555-0163,Friends,\n';
+    const blob=new Blob([csv],{type:'text/csv'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='contacts-sample.csv';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast('Sample CSV downloaded');
+  }
+
+  // ---------- events ----------
+  const fileInput=$('#fileInput');
+  $('#drop').addEventListener('click',()=>fileInput.click());
+  $('#replaceBtn').addEventListener('click',()=>fileInput.click());
+  fileInput.addEventListener('change',e=>{ loadFile(e.target.files[0]); fileInput.value=''; closePanel(); });
+
+  const drop=$('#drop');
+  ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+  ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+  drop.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+
+  $('#templateBtn').addEventListener('click',sampleCSV);
+  $('#addTemplate').addEventListener('click',sampleCSV);
+  $('#redrawBtn').addEventListener('click',redraw);
+  $('#calledBtn').addEventListener('click',markCalled);
+
+  $('#copyBtn').addEventListener('click',()=>{
+    const c=contacts.find(x=>todayPick&&x.id===todayPick.id);
+    if(c&&c.phone){ navigator.clipboard&&navigator.clipboard.writeText(c.phone); toast('Number copied'); }
+  });
+
+  $('#poolSelect').addEventListener('change',async e=>{
+    currentPool=e.target.value; todayPick=null; await store.set(K.pick,null);
+    await ensureTodayPick(); render(true);
+  });
+
+  // manage panel
+  const panel=$('#panel');
+  function openPanel(){ renderList(''); $('#search').value=''; panel.classList.add('open'); }
+  function closePanel(){ panel.classList.remove('open'); }
+  $('#manageBtn').addEventListener('click',openPanel);
+  $('#closePanel').addEventListener('click',closePanel);
+  panel.addEventListener('click',e=>{ if(e.target===panel) closePanel(); });
+  $('#search').addEventListener('input',e=>renderList(e.target.value));
+  $('#clearBtn').addEventListener('click',async()=>{
+    if(!confirm('Remove all contacts? This cannot be undone.')) return;
+    contacts=[]; todayPick=null;
+    await store.set(K.contacts,[]); await store.set(K.pick,null);
+    closePanel(); render(); toast('All contacts cleared');
+  });
+
+  // ---------- init ----------
+  (async function init(){
+    contacts = (await store.get(K.contacts)) || [];
+    todayPick = await store.get(K.pick);
+    history = (await store.get(K.history)) || {};
+    streak = (await store.get(K.streak)) || {count:0,last:null};
+    if(contacts.length) await ensureTodayPick();
+    render(true);
+  })();
+})();
+</script>
+</body>
+</html>
