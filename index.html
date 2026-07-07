@@ -176,7 +176,8 @@
   @keyframes slideup{from{transform:translateY(30px)}to{transform:none}}
   .sheet-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
   .sheet-head h3{font-size:18px;font-weight:700}
-  .sheet .count{font-size:13px;color:var(--on-dark-soft);margin-bottom:18px}
+  .sheet .count{font-size:13px;color:var(--on-dark-soft);margin-bottom:4px}
+  .dbmeta{display:none;font-size:11.5px;color:var(--on-dark-faint);margin-bottom:16px;padding:7px 11px;border-radius:9px;background:rgba(63,157,107,.1);border:1px solid rgba(63,157,107,.2);color:#8FD6B2}
   .search{width:100%;padding:11px 14px;border-radius:11px;background:rgba(255,255,255,.06);
     border:1px solid rgba(255,255,255,.1);color:var(--on-dark);font-family:inherit;font-size:14px;margin-bottom:14px}
   .search::placeholder{color:var(--on-dark-faint)}
@@ -266,12 +267,15 @@
         <button class="icon-btn" id="closePanel" aria-label="Close">✕</button>
       </div>
       <div class="count" id="panelCount"></div>
+      <div class="dbmeta" id="dbMeta"></div>
       <input class="search" id="search" placeholder="Search contacts…" autocomplete="off">
       <div class="clist" id="clist"></div>
       <div class="sheet-actions">
-        <button class="mini" id="replaceBtn">Replace with new CSV</button>
-        <button class="mini" id="addTemplate">Download sample CSV</button>
-        <button class="mini danger" id="clearBtn">Clear all contacts</button>
+        <button class="mini" id="mergeBtn">＋ Add from CSV</button>
+        <button class="mini" id="replaceBtn">Replace with CSV</button>
+        <button class="mini" id="exportBtn">⭳ Export saved CSV</button>
+        <button class="mini" id="addTemplate">Sample CSV</button>
+        <button class="mini danger" id="clearBtn">Clear all</button>
       </div>
     </div>
   </div>
@@ -294,13 +298,14 @@
       try{ await window.storage.set(k,v); }catch(e){ mem[k]=v; }
     }
   };
-  const K = { contacts:'contacts', pick:'todayPick', history:'callHistory', streak:'streakData' };
+  const K = { contacts:'contacts', pick:'todayPick', history:'callHistory', streak:'streakData', raw:'rawCsvFile', meta:'dbMeta' };
 
   // ---------- state ----------
   let contacts = [];
   let todayPick = null;      // {id, date}
   let history = {};          // { 'YYYY-MM-DD': [ids] }
   let streak = { count:0, last:null };
+  let dbMeta = null;         // { name, savedAt, count } — describes the saved CSV file
   let currentPool = '__all__';
 
   // ---------- helpers ----------
@@ -520,11 +525,22 @@
     sel.parentElement.style.display = gs.length ? 'flex':'none';
   }
 
+  function renderDbMeta(){
+    const el=$('#dbMeta');
+    if(dbMeta && contacts.length){
+      const d=new Date(dbMeta.savedAt);
+      const when=d.toLocaleDateString(undefined,{month:'short',day:'numeric'})+' · '+d.toLocaleTimeString(undefined,{hour:'numeric',minute:'2-digit'});
+      el.textContent='✓ Saved in this app — from '+dbMeta.name+', last updated '+when;
+      el.style.display='block';
+    } else { el.style.display='none'; }
+  }
+
   function renderList(filter){
     const list=$('#clist'); list.innerHTML='';
     const f=(filter||'').toLowerCase();
     const items=contacts.filter(c=>!f||c.name.toLowerCase().includes(f)||(c.group||'').toLowerCase().includes(f));
     $('#panelCount').textContent=contacts.length+' contact'+(contacts.length!==1?'s':'')+' saved';
+    renderDbMeta();
     if(!items.length){ list.innerHTML='<div style="padding:14px;color:var(--on-dark-soft);font-size:13.5px">No matches.</div>'; return; }
     items.forEach(c=>{
       const row=document.createElement('div'); row.className='crow';
@@ -545,20 +561,56 @@
     else { $('#foot').textContent=''; }
   }
 
+  // ---------- CSV export helpers ----------
+  function csvEscape(v){ v=(v==null)?'':String(v); return /[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v; }
+  function contactsToCSV(list){
+    const rows=list.map(c=>[c.name,c.phone,c.group,c.birthday].map(csvEscape).join(','));
+    return 'name,phone,group,birthday\n'+rows.join('\n')+'\n';
+  }
+  const dupeKey = c => ((c.name||'').toLowerCase().trim()+'|'+(c.phone||'').replace(/\D/g,''));
+
+  // ---------- save the CSV file to the database ----------
+  async function saveDatabase(fileName, rawText){
+    dbMeta = { name: fileName || 'contacts.csv', savedAt: Date.now(), count: contacts.length };
+    await store.set(K.contacts, contacts);
+    await store.set(K.raw, rawText);      // the actual CSV file content, kept on file
+    await store.set(K.meta, dbMeta);
+  }
+
   // ---------- CSV intake ----------
-  async function loadFile(file){
+  async function loadFile(file, mode){
     if(!file) return;
     if(!/\.csv$/i.test(file.name) && file.type!=='text/csv'){ toast('Please choose a .csv file'); return; }
     const text=await file.text();
     const parsed=contactsFromCSV(text);
     if(!parsed.length){ toast('No contacts found — check the file has a name column'); return; }
-    contacts=parsed;
-    await store.set(K.contacts,contacts);
-    todayPick=null; await store.set(K.pick,null);
-    currentPool='__all__';
-    await ensureTodayPick();
-    render(true);
-    toast(parsed.length+' contact'+(parsed.length!==1?'s':'')+' loaded');
+
+    if(mode==='merge' && contacts.length){
+      const seen=new Set(contacts.map(dupeKey));
+      let added=0;
+      parsed.forEach(c=>{ const k=dupeKey(c); if(!seen.has(k)){ seen.add(k); contacts.push(c); added++; } });
+      await saveDatabase(file.name, contactsToCSV(contacts));
+      await ensureTodayPick();
+      render(true); renderList($('#search')?$('#search').value:'');
+      toast(added ? ('Added '+added+' new contact'+(added!==1?'s':'')+' — saved') : 'Already in your database — nothing new');
+    } else {
+      contacts=parsed;
+      todayPick=null; await store.set(K.pick,null);
+      currentPool='__all__';
+      await saveDatabase(file.name, text);
+      await ensureTodayPick();
+      render(true); renderList('');
+      toast('Saved '+parsed.length+' contact'+(parsed.length!==1?'s':'')+' to your database');
+    }
+  }
+
+  function exportCSV(){
+    if(!contacts.length){ toast('No contacts to export yet'); return; }
+    const blob=new Blob([contactsToCSV(contacts)],{type:'text/csv'});
+    const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+    a.download='my-contacts.csv'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+    toast('Exported '+contacts.length+' saved contacts');
   }
 
   function sampleCSV(){
@@ -577,14 +629,18 @@
 
   // ---------- events ----------
   const fileInput=$('#fileInput');
-  $('#drop').addEventListener('click',()=>fileInput.click());
-  $('#replaceBtn').addEventListener('click',()=>fileInput.click());
-  fileInput.addEventListener('change',e=>{ loadFile(e.target.files[0]); fileInput.value=''; closePanel(); });
+  let pendingMode='replace';
+  function chooseFile(mode){ pendingMode=mode; fileInput.click(); }
+  $('#drop').addEventListener('click',()=>chooseFile('replace'));
+  $('#replaceBtn').addEventListener('click',()=>chooseFile('replace'));
+  $('#mergeBtn').addEventListener('click',()=>chooseFile('merge'));
+  $('#exportBtn').addEventListener('click',exportCSV);
+  fileInput.addEventListener('change',e=>{ loadFile(e.target.files[0], pendingMode); fileInput.value=''; closePanel(); });
 
   const drop=$('#drop');
   ['dragover','dragenter'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
   ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
-  drop.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]); });
+  drop.addEventListener('drop',e=>{ if(e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0],'replace'); });
 
   $('#templateBtn').addEventListener('click',sampleCSV);
   $('#addTemplate').addEventListener('click',sampleCSV);
@@ -610,10 +666,11 @@
   panel.addEventListener('click',e=>{ if(e.target===panel) closePanel(); });
   $('#search').addEventListener('input',e=>renderList(e.target.value));
   $('#clearBtn').addEventListener('click',async()=>{
-    if(!confirm('Remove all contacts? This cannot be undone.')) return;
-    contacts=[]; todayPick=null;
+    if(!confirm('Remove all contacts and the saved CSV file? This cannot be undone.')) return;
+    contacts=[]; todayPick=null; dbMeta=null;
     await store.set(K.contacts,[]); await store.set(K.pick,null);
-    closePanel(); render(); toast('All contacts cleared');
+    await store.set(K.raw,null); await store.set(K.meta,null);
+    closePanel(); render(); toast('Database cleared');
   });
 
   // ---------- init ----------
@@ -622,6 +679,7 @@
     todayPick = await store.get(K.pick);
     history = (await store.get(K.history)) || {};
     streak = (await store.get(K.streak)) || {count:0,last:null};
+    dbMeta = await store.get(K.meta);
     if(contacts.length) await ensureTodayPick();
     render(true);
   })();
